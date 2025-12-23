@@ -98,7 +98,15 @@ def generate():
     import qrcode
     import time
 
-    expiry_ts = int(time.time()) + 120  # 2 minutes
+    # Current UTC timestamp
+    now_utc = int(time.time())
+
+    # Expiry = 2 minutes from now
+    expiry_ts = now_utc + 120
+
+    # Convert to IST (UTC + 5:30)
+    ist_offset = 5 * 3600 + 30 * 60
+    expiry_ist = expiry_ts + ist_offset
 
     url = f"{request.host_url}scan?exp={expiry_ts}"
 
@@ -107,7 +115,10 @@ def generate():
     img.save(buf, format="PNG")
 
     qr_base64 = base64.b64encode(buf.getvalue()).decode()
-    expiry_readable = datetime.datetime.fromtimestamp(expiry_ts).strftime("%H:%M:%S")
+
+    expiry_readable = datetime.datetime.fromtimestamp(
+        expiry_ist
+    ).strftime("%H:%M:%S")
 
     return render_template(
         "admin.html",
@@ -115,6 +126,7 @@ def generate():
         expiry=expiry_readable,
         qr_image="data:image/png;base64," + qr_base64
     )
+
 
 
 
@@ -188,5 +200,6 @@ def export():
         as_attachment=True,
         download_name="attendance.csv"
     )
+
 
 
