@@ -121,17 +121,17 @@ def generate():
 # ---------------- SCAN & MARK ----------------
 @app.route("/scan", methods=["GET", "POST"])
 def scan():
-    exp = request.args.get("exp")
-    now = datetime.datetime.now().strftime("%H:%M")
+    import time
 
-    if exp and now > exp:
-        return "QR Expired ❌"
+    exp = request.args.get("exp")
+    if exp and time.time() > int(exp):
+        return "QR Expired ❌ Please ask admin to generate again."
 
     if request.method == "POST":
         roll = request.form["roll"]
         name = request.form["name"]
         date = datetime.date.today().isoformat()
-        time = datetime.datetime.now().strftime("%H:%M:%S")
+        time_now = datetime.datetime.now().strftime("%H:%M:%S")
 
         conn = sqlite3.connect(DB_PATH, check_same_thread=False)
         c = conn.cursor()
@@ -145,7 +145,7 @@ def scan():
 
         c.execute(
             "INSERT INTO attendance VALUES (NULL, ?, ?, ?, ?)",
-            (roll, name, date, time)
+            (roll, name, date, time_now)
         )
 
         conn.commit()
@@ -154,6 +154,7 @@ def scan():
         return render_template("success.html")
 
     return render_template("scan.html")
+
 
 
 # ---------------- VIEW ----------------
@@ -187,4 +188,5 @@ def export():
         as_attachment=True,
         download_name="attendance.csv"
     )
+
 
