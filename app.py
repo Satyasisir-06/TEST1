@@ -95,24 +95,27 @@ def generate():
     if "admin" not in session:
         return redirect("/")
 
-    # LAZY IMPORT (VERY IMPORTANT FOR VERCEL)
     import qrcode
+    import time
 
-    expiry = (datetime.datetime.now() + datetime.timedelta(minutes=2)).strftime("%H:%M")
-    url = f"{request.host_url}scan?exp={expiry}"
+    expiry_ts = int(time.time()) + 120  # 2 minutes
+
+    url = f"{request.host_url}scan?exp={expiry_ts}"
 
     img = qrcode.make(url)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
 
     qr_base64 = base64.b64encode(buf.getvalue()).decode()
+    expiry_readable = datetime.datetime.fromtimestamp(expiry_ts).strftime("%H:%M:%S")
 
     return render_template(
         "admin.html",
         qr=True,
-        expiry=expiry,
+        expiry=expiry_readable,
         qr_image="data:image/png;base64," + qr_base64
     )
+
 
 
 # ---------------- SCAN & MARK ----------------
@@ -184,3 +187,4 @@ def export():
         as_attachment=True,
         download_name="attendance.csv"
     )
+
