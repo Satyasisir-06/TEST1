@@ -1,42 +1,48 @@
 from flask import Flask, render_template, request, redirect, session, send_file
-import sqlite3, qrcode, datetime, csv, io, base64
+import sqlite3
+import datetime
+import csv
+import io
+import base64
 
 app = Flask(
     __name__,
     template_folder="templates",
     static_folder="static"
 )
-app.config["DEBUG"] = True
 
-app.secret_key = "secret123"
+app.secret_key = "super-secret-key-123"
 
+# Vercel-safe SQLite path
 DB_PATH = "/tmp/attendance.db"
+
 
 # ---------------- HEALTH CHECK ----------------
 @app.route("/health")
 def health():
     return "OK"
 
-# ---------------- DATABASE ----------------
+
+# ---------------- DATABASE INIT ----------------
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     c = conn.cursor()
 
     c.execute("""
-    CREATE TABLE IF NOT EXISTS admin (
-        username TEXT,
-        password TEXT
-    )
+        CREATE TABLE IF NOT EXISTS admin (
+            username TEXT,
+            password TEXT
+        )
     """)
 
     c.execute("""
-    CREATE TABLE IF NOT EXISTS attendance (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        roll TEXT,
-        name TEXT,
-        date TEXT,
-        time TEXT
-    )
+        CREATE TABLE IF NOT EXISTS attendance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            roll TEXT,
+            name TEXT,
+            date TEXT,
+            time TEXT
+        )
     """)
 
     c.execute(
@@ -47,20 +53,22 @@ def init_db():
     conn.commit()
     conn.close()
 
-# SAFE INIT (prevents silent crash)
+
+# Safe init (prevents silent crash)
 try:
     init_db()
 except Exception as e:
     print("DB INIT ERROR:", e)
 
-# ---------------- ROUTES ----------------
+
+# ---------------- LOGIN ----------------
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
         u = request.form["username"]
         p = request.form["password"]
 
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
         c = conn.cursor()
         c.execute(
             "SELECT * FROM admin WHERE username=? AND password=?",
@@ -73,6 +81,7 @@ def index():
     return render_template("index.html")
 
 
+# ---------------- ADMIN ----------------
 @app.route("/admin")
 def admin():
     if "admin" not in session:
@@ -80,10 +89,14 @@ def admin():
     return render_template("admin.html")
 
 
+# ---------------- GENERATE QR ----------------
 @app.route("/generate")
 def generate():
     if "admin" not in session:
         return redirect("/")
+
+    # LAZY IMPORT (VERY IMPORTANT FOR VERCEL)
+    import qrcode
 
     expiry = (datetime.datetime.now() + datetime.timedelta(minutes=2)).strftime("%H:%M")
     url = f"{request.host_url}scan?exp={expiry}"
@@ -102,6 +115,7 @@ def generate():
     )
 
 
+# ---------------- SCAN & MARK ----------------
 @app.route("/scan", methods=["GET", "POST"])
 def scan():
     exp = request.args.get("exp")
@@ -116,7 +130,7 @@ def scan():
         date = datetime.date.today().isoformat()
         time = datetime.datetime.now().strftime("%H:%M:%S")
 
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
         c = conn.cursor()
 
         c.execute(
@@ -139,9 +153,10 @@ def scan():
     return render_template("scan.html")
 
 
+# ---------------- VIEW ----------------
 @app.route("/view")
 def view():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     c = conn.cursor()
     c.execute("SELECT * FROM attendance")
     data = c.fetchall()
@@ -149,9 +164,10 @@ def view():
     return render_template("view.html", data=data)
 
 
+# ---------------- EXPORT CSV ----------------
 @app.route("/export")
 def export():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     c = conn.cursor()
     c.execute("SELECT * FROM attendance")
     data = c.fetchall()
@@ -168,8 +184,3 @@ def export():
         as_attachment=True,
         download_name="attendance.csv"
     )
-    @app.errorhandler(Exception)
-def handle_error(e):
-    return f"ERROR: {str(e)}", 500
-
-
