@@ -6,6 +6,7 @@ app = Flask(
     template_folder="templates",
     static_folder="static"
 )
+app.config["DEBUG"] = True
 
 app.secret_key = "secret123"
 
@@ -167,3 +168,8 @@ def export():
         as_attachment=True,
         download_name="attendance.csv"
     )
+    @app.errorhandler(Exception)
+def handle_error(e):
+    return f"ERROR: {str(e)}", 500
+
+
